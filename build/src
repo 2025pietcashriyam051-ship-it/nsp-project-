@@ -1,1 +1,330 @@
+//main.java 
+package com.college;
+
+import com.college.ui.LoginFrame;
+import com.formdev.flatlaf.FlatLightLaf;
+
+import javax.swing.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Apply FlatLaf for a modern look
+        try {
+            UIManager.setLookAndFeel(new FlatLightLaf());
+        } catch (Exception ex) {
+            System.err.println("Failed to initialize LaF");
+        }
+
+        // Set global font properties to make UI look cleaner
+        UIManager.put("defaultFont", new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 14));
+
+        SwingUtilities.invokeLater(() -> {
+            LoginFrame loginFrame = new LoginFrame();
+            loginFrame.setVisible(true);
+        });
+    }
+}
+
+
+//login.java
+package com.college.ui;
+
+import com.college.service.AuthService;
+import com.college.util.DatabaseConnection;
+import com.college.util.UIConstants;
+import com.college.util.ValidationUtils;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
+
+/**
+ * Premium login screen with gradient background, centered card,
+ * username/password/role fields, and MySQL authentication.
+ */
+public class LoginFrame extends JFrame {
+
+    private JTextField usernameField;
+    private JPasswordField passwordField;
+    private JComboBox<String> roleCombo;
+    private JLabel errorLabel;
+    private JButton loginButton;
+    private JCheckBox showPasswordCheck;
+    private final AuthService authService = new AuthService();
+
+    public LoginFrame() {
+        setTitle("College Attendance & Performance System - Login");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(1000, 650);
+        setLocationRelativeTo(null);
+        setResizable(false);
+
+        // Main panel with gradient background
+        JPanel mainPanel = new JPanel(new GridBagLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Dark gradient background
+                GradientPaint gradient = new GradientPaint(
+                        0, 0, new Color(15, 23, 42),
+                        getWidth(), getHeight(), new Color(30, 41, 59)
+                );
+                g2.setPaint(gradient);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+
+                // Subtle decorative circles
+                g2.setColor(new Color(37, 99, 235, 15));
+                g2.fillOval(-100, -100, 400, 400);
+                g2.fillOval(getWidth() - 200, getHeight() - 200, 400, 400);
+
+                g2.dispose();
+            }
+        };
+
+        // Login card
+        JPanel cardPanel = createLoginCard();
+        mainPanel.add(cardPanel);
+
+        setContentPane(mainPanel);
+    }
+
+    private JPanel createLoginCard() {
+        JPanel card = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Card shadow
+                g2.setColor(new Color(0, 0, 0, 30));
+                g2.fill(new RoundRectangle2D.Float(4, 4, getWidth() - 4, getHeight() - 4, 20, 20));
+
+                // Card background
+                g2.setColor(Color.WHITE);
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth() - 4, getHeight() - 4, 20, 20));
+                g2.dispose();
+            }
+        };
+
+        card.setOpaque(false);
+        card.setPreferredSize(new Dimension(420, 520));
+        card.setLayout(new GridBagLayout());
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(6, 40, 6, 40);
+
+        // Logo / Title
+        gbc.gridy = 0;
+        gbc.insets = new Insets(30, 40, 5, 40);
+        JLabel titleLabel = new JLabel("CAPS", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 32));
+        titleLabel.setForeground(UIConstants.PRIMARY);
+        card.add(titleLabel, gbc);
+
+        gbc.gridy = 1;
+        gbc.insets = new Insets(0, 40, 20, 40);
+        JLabel subtitleLabel = new JLabel("College Attendance & Performance System", SwingConstants.CENTER);
+        subtitleLabel.setFont(UIConstants.FONT_SMALL);
+        subtitleLabel.setForeground(UIConstants.TEXT_SECONDARY);
+        card.add(subtitleLabel, gbc);
+
+        // Username
+        gbc.gridy = 2;
+        gbc.insets = new Insets(5, 40, 3, 40);
+        JLabel userLabel = new JLabel("Username");
+        userLabel.setFont(UIConstants.FONT_BODY_BOLD);
+        userLabel.setForeground(UIConstants.TEXT_PRIMARY);
+        card.add(userLabel, gbc);
+
+        gbc.gridy = 3;
+        gbc.insets = new Insets(0, 40, 8, 40);
+        usernameField = new JTextField();
+        usernameField.setFont(UIConstants.FONT_BODY);
+        usernameField.setPreferredSize(new Dimension(0, 40));
+        usernameField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UIConstants.CARD_BORDER, 1),
+                BorderFactory.createEmptyBorder(5, 12, 5, 12)
+        ));
+        card.add(usernameField, gbc);
+
+        // Password
+        gbc.gridy = 4;
+        gbc.insets = new Insets(5, 40, 3, 40);
+        JLabel passLabel = new JLabel("Password");
+        passLabel.setFont(UIConstants.FONT_BODY_BOLD);
+        passLabel.setForeground(UIConstants.TEXT_PRIMARY);
+        card.add(passLabel, gbc);
+
+        gbc.gridy = 5;
+        gbc.insets = new Insets(0, 40, 5, 40);
+        passwordField = new JPasswordField();
+        passwordField.setFont(UIConstants.FONT_BODY);
+        passwordField.setPreferredSize(new Dimension(0, 40));
+        passwordField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UIConstants.CARD_BORDER, 1),
+                BorderFactory.createEmptyBorder(5, 12, 5, 12)
+        ));
+        card.add(passwordField, gbc);
+
+        // Show password checkbox
+        gbc.gridy = 6;
+        gbc.insets = new Insets(0, 40, 8, 40);
+        showPasswordCheck = new JCheckBox("Show Password");
+        showPasswordCheck.setFont(UIConstants.FONT_SMALL);
+        showPasswordCheck.setForeground(UIConstants.TEXT_SECONDARY);
+        showPasswordCheck.setOpaque(false);
+        showPasswordCheck.addActionListener(e -> {
+            if (showPasswordCheck.isSelected()) {
+                passwordField.setEchoChar((char) 0);
+            } else {
+                passwordField.setEchoChar('\u2022');
+            }
+        });
+        card.add(showPasswordCheck, gbc);
+
+        // Role dropdown
+        gbc.gridy = 7;
+        gbc.insets = new Insets(5, 40, 3, 40);
+        JLabel roleLabel = new JLabel("Login As");
+        roleLabel.setFont(UIConstants.FONT_BODY_BOLD);
+        roleLabel.setForeground(UIConstants.TEXT_PRIMARY);
+        card.add(roleLabel, gbc);
+
+        gbc.gridy = 8;
+        gbc.insets = new Insets(0, 40, 12, 40);
+        roleCombo = new JComboBox<>(new String[]{"ADMIN", "FACULTY", "STUDENT"});
+        roleCombo.setFont(UIConstants.FONT_BODY);
+        roleCombo.setPreferredSize(new Dimension(0, 40));
+        card.add(roleCombo, gbc);
+
+        // Error label
+        gbc.gridy = 9;
+        gbc.insets = new Insets(0, 40, 5, 40);
+        errorLabel = new JLabel(" ");
+        errorLabel.setFont(UIConstants.FONT_SMALL);
+        errorLabel.setForeground(UIConstants.DANGER);
+        errorLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        card.add(errorLabel, gbc);
+
+        // Login button
+        gbc.gridy = 10;
+        gbc.insets = new Insets(5, 40, 30, 40);
+        loginButton = new JButton("Login") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                Color bg = getModel().isPressed() ? UIConstants.PRIMARY_HOVER.darker() :
+                        getModel().isRollover() ? UIConstants.PRIMARY_HOVER : UIConstants.PRIMARY;
+
+                g2.setColor(bg);
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
+                g2.dispose();
+
+                super.paintComponent(g);
+            }
+        };
+        loginButton.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        loginButton.setForeground(Color.WHITE);
+        loginButton.setPreferredSize(new Dimension(0, 45));
+        loginButton.setContentAreaFilled(false);
+        loginButton.setBorderPainted(false);
+        loginButton.setFocusPainted(false);
+        loginButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        loginButton.addActionListener(e -> performLogin());
+        // Enter key triggers login
+        passwordField.addActionListener(e -> performLogin());
+        usernameField.addActionListener(e -> passwordField.requestFocus());
+
+        card.add(loginButton, gbc);
+
+        return card;
+    }
+
+    /**
+     * Perform login using MySQL authentication.
+     */
+    private void performLogin() {
+        String username = usernameField.getText().trim();
+        String password = new String(passwordField.getPassword());
+        String role = (String) roleCombo.getSelectedItem();
+
+        // Validate inputs
+        if (ValidationUtils.isEmpty(username)) {
+            showError("Username is required.");
+            usernameField.requestFocus();
+            return;
+        }
+        if (ValidationUtils.isEmpty(password)) {
+            showError("Password is required.");
+            passwordField.requestFocus();
+            return;
+        }
+
+        loginButton.setEnabled(false);
+        loginButton.setText("Logging in...");
+        errorLabel.setText(" ");
+
+        // Authenticate in background thread
+        SwingWorker<Boolean, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Boolean doInBackground() throws Exception {
+                return authService.login(username, password, role);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    boolean success = get();
+                    if (success) {
+                        // Open main frame
+                        SwingUtilities.invokeLater(() -> {
+                            MainFrame mainFrame = new MainFrame();
+                            mainFrame.setVisible(true);
+                            LoginFrame.this.dispose();
+                        });
+                    } else {
+                        showError("Invalid username, password, or role. Please try again.");
+                        passwordField.setText("");
+                        passwordField.requestFocus();
+                    }
+                } catch (Exception e) {
+                    showError("Connection error: " + e.getMessage());
+                    e.printStackTrace();
+                } finally {
+                    loginButton.setEnabled(true);
+                    loginButton.setText("Login");
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void showError(String message) {
+        errorLabel.setText(message);
+        // Shake animation
+        Timer shakeTimer = new Timer(50, null);
+        final int[] count = {0};
+        final int originalX = getX();
+        shakeTimer.addActionListener(e -> {
+            count[0]++;
+            if (count[0] > 6) {
+                shakeTimer.stop();
+                setLocation(originalX, getY());
+            } else {
+                setLocation(originalX + (count[0] % 2 == 0 ? 5 : -5), getY());
+            }
+        });
+        shakeTimer.start();
+    }
+}
 
