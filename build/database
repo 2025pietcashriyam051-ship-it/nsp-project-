@@ -1,1 +1,115 @@
+package com.college.util;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+/**
+ * Singleton database connection manager.
+ * Now using H2 embedded database to allow the application to run
+ * standalone with full mock data without requiring a local MySQL server!
+ */
+public class DatabaseConnection {
+
+    // Using H2 in-memory database with MySQL compatibility mode
+    private static final String DEFAULT_URL = "jdbc:h2:mem:college;MODE=MySQL;DB_CLOSE_DELAY=-1";
+    private static final String DEFAULT_USER = "sa";
+    private static final String DEFAULT_PASSWORD = "";
+
+    private static String url = DEFAULT_URL;
+    private static String user = DEFAULT_USER;
+    private static String password = DEFAULT_PASSWORD;
+
+    private static Connection connection;
+    private static boolean initialized = false;
+
+    private DatabaseConnection() {
+        // Private constructor to prevent instantiation
+    }
+
+    public static void configure(String dbUrl, String dbUser, String dbPassword) {
+        url = dbUrl;
+        user = dbUser;
+        password = dbPassword;
+        closeConnection();
+    }
+
+    public static Connection getConnection() throws SQLException {
+        if (connection == null || connection.isClosed()) {
+            try {
+                // Load H2 driver instead of MySQL
+                Class.forName("org.h2.Driver");
+                connection = DriverManager.getConnection(url, user, password);
+                
+                // If it's the in-memory database, initialize our schema and mock data!
+                if (!initialized && url.startsWith("jdbc:h2:mem")) {
+                    initializeMockData(connection);
+                    initialized = true;
+                }
+            } catch (ClassNotFoundException e) {
+                throw new SQLException("H2 JDBC Driver not found. Did you add it to pom.xml?", e);
+            }
+        }
+        return connection;
+    }
+
+    /**
+     * Reads our MySQL schema.sql and runs it against the H2 in-memory database.
+     */
+    private static void initializeMockData(Connection conn) {
+        System.out.println("Initializing Embedded Database with Mock Data...");
+        try (Statement stmt = conn.createStatement();
+             BufferedReader reader = new BufferedReader(new FileReader("database/schema.sql"))) {
+            
+            StringBuilder sql = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // Ignore MySQL-specific database creation commands that H2 doesn't need
+                String trimmed = line.trim().toUpperCase();
+                if (trimmed.startsWith("DROP DATABASE") || 
+                    trimmed.startsWith("CREATE DATABASE") || 
+                    trimmed.startsWith("USE ")) {
+                    continue;
+                }
+                sql.append(line).append("\n");
+            }
+            
+            // Execute the entire schema script to build tables and insert data
+            stmt.execute(sql.toString());
+            System.out.println("Mock Data Initialized Successfully.");
+            
+        } catch (Exception e) {
+            System.err.println("Failed to initialize mock database from schema.sql: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static boolean testConnection() {
+        try {
+            Connection conn = getConnection();
+            return conn != null && !conn.isClosed();
+        } catch (SQLException e) {
+            System.err.println("Database connection failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static void closeConnection() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+            }
+        } catch (SQLException e) {
+            System.err.println("Error closing connection: " + e.getMessage());
+        }
+        connection = null;
+    }
+
+    public static String getUrl() { return url; }
+    public static String getUser() { return user; }
+    public static String getPassword() { return password; }
+}
 
